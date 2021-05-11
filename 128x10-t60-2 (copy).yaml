@@ -1,0 +1,58 @@
+%YAML 1.2
+---
+name: '128x10-2'                  # ideally no spaces
+gpu: 'all'                                 # gpu id to process on
+
+dataset: 
+  num_chunks: 100000000                   # newest nof chunks to parse
+  allow_less_chunks: true
+  train_ratio: 0.90                    # trainingset ratio
+  # For separated test and train data.
+  input_train: '/temp/sergio-v/t60/train/rescored/*/' # supports glob
+  input_test: '/temp/sergio-v/t60/test/rescored/*/'  # supports glob
+  # For a one-shot run with all data in one directory.
+  #input: '/work/lc0/data/'
+  train_workers: 16
+  test_workers: 8
+
+training:
+    swa: true
+    swa_output: true
+    swa_steps: 25
+    swa_max_n: 10
+    mask_legal_moves: true
+    renorm: true
+    renorm_max_r: 1.0
+    renorm_max_d: 0.0
+    q_ratio: 0.0
+    max_grad_norm: 3.0
+    batch_size: 4096                   # training batch
+    num_batch_splits: 4
+    test_steps: 1000                    # eval test set values after this many steps
+    num_test_positions: 100000
+    train_avg_report_steps: 100        # training reports its average values after this many steps.
+    total_steps: 1000000000                  # terminate after these steps
+    warmup_steps: 125
+    checkpoint_steps: 10000          # optional frequency for checkpointing before finish
+    shuffle_size: 500000               # size of the shuffle buffer
+    lr_values:                         # list of learning rates
+        - 0.0002
+        - 0.0002
+    lr_boundaries:                     # list of boundaries
+        - 100
+    policy_loss_weight: 1.0            # weight of policy loss
+    value_loss_weight: 1.0             # weight of value loss
+    reg_loss_weight: 1.0
+    moves_left_loss_weight: 0.1
+    moves_left_gradient_flow: 1.0
+    path: '/home/s/sergio-v/project/new/networks'         # network storage dir
+    trainstop_path: '/temp/sergio-v/trainstop'
+    memory_limit: 9000
+
+model:
+  filters: 128
+  residual_blocks: 10
+  se_ratio: 4
+  value_channels: 32
+  moves_left: 'v1'
+...
