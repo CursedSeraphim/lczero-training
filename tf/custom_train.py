@@ -25,7 +25,7 @@ import gzip
 import random
 import multiprocessing as mp
 import tensorflow as tf
-import keras
+import numpy as np
 from tfprocess import TFProcess
 from chunkparser import ChunkParser
 
@@ -62,7 +62,7 @@ def get_latest_chunks(path, num_chunks, allow_less, sort_key_fn):
             print("[done]")
             print("{} - {}".format(os.path.basename(chunks[-1]),
                                    os.path.basename(chunks[0])))
-            random.shuffle(chunks)
+            # random.shuffle(chunks)
             return chunks
         else:
             print("Not enough chunks {}".format(len(chunks)))
@@ -74,7 +74,7 @@ def get_latest_chunks(path, num_chunks, allow_less, sort_key_fn):
     chunks = chunks[:num_chunks]
     print("{} - {}".format(os.path.basename(chunks[-1]),
                            os.path.basename(chunks[0])))
-    random.shuffle(chunks)
+    # random.shuffle(chunks)
     return chunks
 
 
@@ -364,7 +364,8 @@ def select_extractor(mode):
 
 
 def semi_sample(x):
-    return tf.slice(tf.random.shuffle(x), [0], [SKIP_MULTIPLE])
+    return tf.slice(x, [0], [SKIP_MULTIPLE])
+    # return tf.slice(tf.random.shuffle(x), [0], [SKIP_MULTIPLE])
 
 
 def main(cmd):
@@ -377,6 +378,7 @@ def main(cmd):
     experimental_parser = cfg['dataset'].get('experimental_v5_only_dataset',
                                              False)
     # num_train = int(num_chunks * train_ratio)
+    # we just need to use one data loader, just put everything into train
     num_train = int(num_chunks)
     num_test = num_chunks - num_train
     sort_type = cfg['dataset'].get('sort_type', 'mtime')
@@ -402,7 +404,8 @@ def main(cmd):
         train_chunks = chunks[:num_train]
         test_chunks = chunks[num_train:]
 
-    shuffle_size = cfg['training']['shuffle_size']
+    # shuffle_size = cfg['training']['shuffle_size']
+    shuffle_size = 1
     total_batch_size = cfg['training']['batch_size']
     batch_splits = cfg['training'].get('num_batch_splits', 1)
     train_workers = cfg['dataset'].get('train_workers', None)
@@ -437,11 +440,13 @@ def main(cmd):
             num_parallel_reads=experimental_reads)
 
     if experimental_parser:
-        train_dataset = tf.data.Dataset.from_tensor_slices(train_chunks).shuffle(len(train_chunks)).repeat().batch(256)\
+        # train_dataset = tf.data.Dataset.from_tensor_slices(train_chunks).shuffle(len(train_chunks)).repeat().batch(256)\
+        train_dataset = tf.data.Dataset.from_tensor_slices(train_chunks).repeat().batch(256)\
                          .interleave(read, num_parallel_calls=2)\
                          .batch(SKIP_MULTIPLE*SKIP).map(semi_sample).unbatch()\
-                         .shuffle(shuffle_size)\
                          .batch(split_batch_size).map(extractor)
+                        #  .shuffle(shuffle_size)\
+                        # .batch(split_batch_size).map(extractor)
     else:
         train_parser = ChunkParser(train_chunks,
                                    tfprocess.INPUT_MODE,
@@ -459,11 +464,14 @@ def main(cmd):
 
     shuffle_size = int(shuffle_size * (1.0 - train_ratio))
     if experimental_parser:
-        test_dataset = tf.data.Dataset.from_tensor_slices(test_chunks).shuffle(len(test_chunks)).repeat().batch(256)\
+        # test_dataset = tf.data.Dataset.from_tensor_slices(test_chunks).shuffle(len(test_chunks)).repeat().batch(256)\
+        test_dataset = tf.data.Dataset.from_tensor_slices(test_chunks).repeat().batch(256)\
                          .interleave(read, num_parallel_calls=2)\
                          .batch(SKIP_MULTIPLE*SKIP).map(semi_sample).unbatch()\
-                         .shuffle(shuffle_size)\
                          .batch(split_batch_size).map(extractor)
+                        #  .shuffle(shuffle_size)\
+                        #  .batch(split_batch_size).map(extractor)
+                         
     else:
         # no value focus for test_parser
         test_parser = ChunkParser(test_chunks,
@@ -509,13 +517,25 @@ def main(cmd):
     x, _, _, _, _ = nxt
     # x2_0_r = tf.reshape(x[0], [1, 112, 64])
 
-    pred = tfprocess.model.predict(x)
+    # pred = tfprocess.model.predict(x)
 
-    # TODO create model that outputs previous layer's results
-    earlyPredictor = tf.keras.models.Model(tfprocess.model.inputs, [tfprocess.model.outputs, tfprocess.model.get_layer('activation_31').output])
+    earlyPredictor = tf.keras.models.Model(tfprocess.model.inputs, [tfprocess.model.inputs, tfprocess.model.outputs, tfprocess.model.get_layer('activation_31').output])
     early_pred_single = earlyPredictor.predict(x)
-    # print(early_pred_single[0]) # output
-    print(early_pred_single[1]) # intermediate
+    # print(np.array(early_pred_single[0]).shape)
+    input = np.array(early_pred_single[0])
+    print(input.shape)
+
+    # TODO make sure no shuffling happens. the following output should clearly show the first few moves of the game w.r.t. pawn placement
+    # investigate first 5 pawn moves
+    np.set_printoptions(threshold=sys.maxsize)
+    for i in range(5):
+        print(input[0, i, 0].reshape(8,8))
+        print()
+    print()
+
+    # print(early_pred_single[0]) # input
+    # print(early_pred_single[1]) # output
+    # print(early_pred_single[2]) # intermediate layer
 
     # print(train_parser.sample_record())
     # print(next(tfprocess.train_iter))

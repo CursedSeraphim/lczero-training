@@ -9,7 +9,8 @@ import tqdm
 
 merge_files = 100
 processes = 8
-shuffle = True
+# shuffle = True
+shuffle = False
 record_length = 8292
 
 
@@ -33,7 +34,8 @@ def shuffle(files):
         with gzip.open(filename, 'rb') as f:
             data.extend(positions(f.read()))
     if shuffle:
-        random.shuffle(data)
+        pass
+        # random.shuffle(data)
     for d in data:
         if d[0] != 0x04:
             print(files)

@@ -107,7 +107,7 @@ def chunk_reader(chunk_filenames, chunk_filename_queue):
     while True:
         if not chunks:
             chunks, done = done, chunks
-            random.shuffle(chunks)
+            # random.shuffle(chunks)
         if not chunks:
             print("chunk_reader didn't find any chunks.")
             return None

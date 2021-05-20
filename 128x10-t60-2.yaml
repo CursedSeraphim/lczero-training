@@ -8,10 +8,10 @@ dataset:
   allow_less_chunks: true
   train_ratio: 1.0                    # trainingset ratio
   # For separated test and train data.
-  input_train: 'tf/data/*/' # supports glob
-  input_test: 'tf/data/*/'  # supports glob
+  # input_train: 'tf/data/*/' # supports glob
+  # input_test: 'tf/data/*/'  # supports glob
   # For a one-shot run with all data in one directory.
-  #input: '/work/lc0/data/'
+  input: 'tf/data/*/'
   train_workers: 1
   test_workers: 1
 
