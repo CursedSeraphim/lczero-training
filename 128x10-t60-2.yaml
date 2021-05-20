@@ -6,7 +6,7 @@ gpu: 'all'                                 # gpu id to process on
 dataset: 
   num_chunks: 5                   # newest nof chunks to parse
   allow_less_chunks: true
-  train_ratio: 0.90                    # trainingset ratio
+  train_ratio: 1.0                    # trainingset ratio
   # For separated test and train data.
   input_train: 'tf/data/*/' # supports glob
   input_test: 'tf/data/*/'  # supports glob

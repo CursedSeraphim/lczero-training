@@ -25,6 +25,7 @@ import gzip
 import random
 import multiprocessing as mp
 import tensorflow as tf
+import keras
 from tfprocess import TFProcess
 from chunkparser import ChunkParser
 
@@ -375,7 +376,8 @@ def main(cmd):
     train_ratio = cfg['dataset']['train_ratio']
     experimental_parser = cfg['dataset'].get('experimental_v5_only_dataset',
                                              False)
-    num_train = int(num_chunks * train_ratio)
+    # num_train = int(num_chunks * train_ratio)
+    num_train = int(num_chunks)
     num_test = num_chunks - num_train
     sort_type = cfg['dataset'].get('sort_type', 'mtime')
     if sort_type == 'mtime':
@@ -492,40 +494,28 @@ def main(cmd):
         test_dataset = test_dataset.with_options(options)
         if validation_dataset is not None:
             validation_dataset = validation_dataset.with_options(options)
+
+
     tfprocess.init_v2(train_dataset, test_dataset, validation_dataset)
-    # TODO
+    # load net from weights file given in yaml config
     tfprocess.replace_weights_v2(proto_filename=cmd.net, ignore_errors=False)
+
+
+    # TODO
     print(tfprocess.model.summary())
     print(tfprocess.train_dataset)
-    # print(tfprocess.train_iter)
-    nxt = next(iter(tfprocess.train_dataset))
-
-    # batchgen = train_parser.parse()
-    # data = next(batchgen)
-
-    # batch = (np.reshape(np.frombuffer(data[0], dtype=np.float32),
-    #                     (batch_size, 112, 64)),
-    #             np.reshape(np.frombuffer(data[1], dtype=np.int32),
-    #                     (batch_size, 1858)),
-    #             np.reshape(np.frombuffer(data[2], dtype=np.float32),
-    #                     (batch_size, 3)),
-    #             np.reshape(np.frombuffer(data[3], dtype=np.float32),
-    #                     (batch_size, 3)))
-
-    # print(train_chunks)
-    # print(train_parser)
-    # nxt = next(train_parser.parse())
-    # # print(nxt)
-    # print(type(nxt))
-    # print(len(nxt))
+    data_iter = iter(tfprocess.train_dataset)
+    nxt = next(data_iter)
     x, _, _, _, _ = nxt
-    # tf cpu Conv2d only allows NHWC instead of NCHW
-    # x2 = tf.transpose(x, [0, 2, 1])
-    x2_0 = x[0]
-    x2_0_r = tf.reshape(x2_0, [1, 112, 64])
-    pred = tfprocess.model(x2_0_r)
-    print(type(pred))
-    print(pred.shape)
+    # x2_0_r = tf.reshape(x[0], [1, 112, 64])
+
+    pred = tfprocess.model.predict(x)
+
+    # TODO create model that outputs previous layer's results
+    earlyPredictor = tf.keras.models.Model(tfprocess.model.inputs, [tfprocess.model.outputs, tfprocess.model.get_layer('activation_31').output])
+    early_pred_single = earlyPredictor.predict(x)
+    # print(early_pred_single[0]) # output
+    print(early_pred_single[1]) # intermediate
 
     # print(train_parser.sample_record())
     # print(next(tfprocess.train_iter))
