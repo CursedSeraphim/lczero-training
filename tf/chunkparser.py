@@ -102,6 +102,7 @@ def chunk_reader(chunk_filenames, chunk_filename_queue):
     order to output_pipes.
     """
     chunks = []
+    chunk_filenames = sorted(chunk_filenames)
     done = chunk_filenames
 
     while True:
@@ -110,6 +111,9 @@ def chunk_reader(chunk_filenames, chunk_filename_queue):
             # random.shuffle(chunks)
         if not chunks:
             print("chunk_reader didn't find any chunks.")
+            print()
+            print('exiting')
+            print()
             return None
         while len(chunks):
             filename = chunks.pop()
@@ -184,6 +188,8 @@ class ChunkParser:
         self.writers = []
         self.processes = []
         self.chunk_filename_queue = mp.Queue(maxsize=4096)
+        # for fn in sorted(chunks):
+        #     self.chunk_filename_queue.put(fn)
         for _ in range(workers):
             read, write = mp.Pipe(duplex=False)
             p = mp.Process(target=self.task,
@@ -441,11 +447,11 @@ class ChunkParser:
                 orig_q = struct.unpack('f', record[8328:8332])[0]
                 
                 # if orig_q is NaN, accept, else accept based on value focus
-                if not np.isnan(orig_q):
-                    diff_q = abs(best_q - orig_q)
-                    thresh_p = self.value_focus_min + self.value_focus_slope * diff_q
-                    if thresh_p < 1.0 and random.random() > thresh_p:
-                        continue
+                # if not np.isnan(orig_q):
+                #     diff_q = abs(best_q - orig_q)
+                #     thresh_p = self.value_focus_min + self.value_focus_slope * diff_q
+                #     if thresh_p < 1.0 and random.random() > thresh_p:
+                #         continue
 
             yield record
 
@@ -456,7 +462,9 @@ class ChunkParser:
         """
         self.init_structs()
         while True:
+            # print('before grabbing filename')
             filename = chunk_filename_queue.get()
+            # print('task() filename from reader:', filename)
             try:
                 with gzip.open(filename, 'rb') as chunk_file:
                     version = chunk_file.read(4)
@@ -489,7 +497,7 @@ class ChunkParser:
         Read v6 records from child workers, shuffle, and yield
         records.
         """
-        sbuff = sb.ShuffleBuffer(self.v6_struct.size, self.shuffle_size)
+        sbuff = sb.ShuffleBuffer(self.v6_struct.size, 1)
         while len(self.readers):
             for r in self.readers:
                 try:

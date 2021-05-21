@@ -442,7 +442,7 @@ def main(cmd):
     if experimental_parser:
         # train_dataset = tf.data.Dataset.from_tensor_slices(train_chunks).shuffle(len(train_chunks)).repeat().batch(256)\
         train_dataset = tf.data.Dataset.from_tensor_slices(train_chunks).repeat().batch(256)\
-                         .interleave(read, num_parallel_calls=2)\
+                         .interleave(read, num_parallel_calls=1)\
                          .batch(SKIP_MULTIPLE*SKIP).map(semi_sample).unbatch()\
                          .batch(split_batch_size).map(extractor)
                         #  .shuffle(shuffle_size)\
@@ -508,6 +508,34 @@ def main(cmd):
     # load net from weights file given in yaml config
     tfprocess.replace_weights_v2(proto_filename=cmd.net, ignore_errors=False)
 
+    # TODO try doing this manually
+    try:
+        with gzip.open(filename, 'rb') as chunk_file:
+            version = chunk_file.read(4)
+            chunk_file.seek(0)
+            if version == V6_VERSION:
+                record_size = self.v6_struct.size
+            elif version == V5_VERSION:
+                record_size = self.v5_struct.size
+            elif version == V4_VERSION:
+                record_size = self.v4_struct.size
+            elif version == V3_VERSION:
+                record_size = self.v3_struct.size
+            else:
+                print('Unknown version {} in file {}'.format(
+                    version, filename))
+                continue
+            while True:
+                chunkdata = chunk_file.read(256 * record_size)
+                if len(chunkdata) == 0:
+                    break
+                for item in self.sample_record(chunkdata):
+                    writer.send_bytes(item)
+
+    except:
+        print("failed to parse {}".format(filename))
+        continue
+
 
     # TODO
     print(tfprocess.model.summary())
@@ -547,11 +575,11 @@ def main(cmd):
     # Assumes average of 10 samples per test game.
     # For simplicity, testing can use the split batch size instead of total batch size.
     # This does not affect results, because test results are simple averages that are independent of batch size.
-    num_evals = cfg['training'].get('num_test_positions',
-                                    len(test_chunks) * 10)
-    num_evals = max(1, num_evals // ChunkParser.BATCH_SIZE)
-    print("Using {} evaluation batches".format(num_evals))
-    tfprocess.total_batch_size = total_batch_size
+    # num_evals = cfg['training'].get('num_test_positions',
+    #                                 len(test_chunks) * 10)
+    # num_evals = max(1, num_evals // ChunkParser.BATCH_SIZE)
+    # print("Using {} evaluation batches".format(num_evals))
+    # tfprocess.total_batch_size = total_batch_size
     # tfprocess.process_loop_v2(total_batch_size,
     #                           num_evals,
     #                           batch_splits=batch_splits)
