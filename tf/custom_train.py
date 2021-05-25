@@ -26,8 +26,20 @@ import random
 import multiprocessing as mp
 import tensorflow as tf
 import numpy as np
+import struct
 from tfprocess import TFProcess
 from chunkparser import ChunkParser
+
+V6_VERSION = struct.pack('i', 6)
+V5_VERSION = struct.pack('i', 5)
+CLASSICAL_INPUT = struct.pack('i', 1)
+V4_VERSION = struct.pack('i', 4)
+V3_VERSION = struct.pack('i', 3)
+V6_STRUCT_STRING = '4si7432s832sBBBBBBBbfffffffffffffffIHH4H'
+V5_STRUCT_STRING = '4si7432s832sBBBBBBBbfffffff'
+V4_STRUCT_STRING = '4s7432s832sBBBBBBBbffff'
+V3_STRUCT_STRING = '4s7432s832sBBBBBBBb'
+
 
 SKIP = 32
 SKIP_MULTIPLE = 1024
@@ -509,40 +521,24 @@ def main(cmd):
     tfprocess.replace_weights_v2(proto_filename=cmd.net, ignore_errors=False)
 
     # TODO try doing this manually
-    try:
-        with gzip.open(filename, 'rb') as chunk_file:
-            version = chunk_file.read(4)
-            chunk_file.seek(0)
-            if version == V6_VERSION:
-                record_size = self.v6_struct.size
-            elif version == V5_VERSION:
-                record_size = self.v5_struct.size
-            elif version == V4_VERSION:
-                record_size = self.v4_struct.size
-            elif version == V3_VERSION:
-                record_size = self.v3_struct.size
-            else:
-                print('Unknown version {} in file {}'.format(
-                    version, filename))
-                continue
-            while True:
-                chunkdata = chunk_file.read(256 * record_size)
-                if len(chunkdata) == 0:
-                    break
-                for item in self.sample_record(chunkdata):
-                    writer.send_bytes(item)
+    custom_parse_gen = train_parser.custom_parse(train_chunks)
+    custom_iter = iter(custom_parse_gen)
+    data = next(custom_iter)
+    planes, probs, winner, best_q = train_parser.custom_get_batch(data)
+    print(planes.shape)
+    x = planes
 
-    except:
-        print("failed to parse {}".format(filename))
-        continue
-
+    for i in range(5):
+        print(x[i, 0].reshape(8,8))
+        print()
+    print()
 
     # TODO
-    print(tfprocess.model.summary())
-    print(tfprocess.train_dataset)
-    data_iter = iter(tfprocess.train_dataset)
-    nxt = next(data_iter)
-    x, _, _, _, _ = nxt
+    # print(tfprocess.model.summary())
+    # print(tfprocess.train_dataset)
+    # data_iter = iter(tfprocess.train_dataset)
+    # nxt = next(data_iter)
+    # x, _, _, _, _ = nxt
     # x2_0_r = tf.reshape(x[0], [1, 112, 64])
 
     # pred = tfprocess.model.predict(x)

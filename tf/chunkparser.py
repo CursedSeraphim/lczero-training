@@ -549,6 +549,61 @@ class ChunkParser:
             yield b
 
 
+    def custom_parse(self, train_chunks):
+        gen = self.custom_gen(train_chunks=train_chunks)        # read from workers
+        gen = self.tuple_gen(gen)  # convert v6->tuple
+        gen = self.batch_gen(gen)  # assemble into batches
+        for b in gen:
+            yield b
+
+
+    def custom_get_batch(self, data):
+        planes, probs, winner, best_q = (np.reshape(np.frombuffer(data[0], dtype=np.float32),
+                            (self.batch_size, 112, 64)),
+                 np.reshape(np.frombuffer(data[1], dtype=np.int32),
+                            (self.batch_size, 1858)),
+                 np.reshape(np.frombuffer(data[2], dtype=np.float32),
+                            (self.batch_size, 3)),
+                 np.reshape(np.frombuffer(data[3], dtype=np.float32),
+                            (self.batch_size, 3)))
+        
+        return planes, probs, winner, best_q
+
+    def custom_gen(self, train_chunks):
+        for filename in train_chunks:
+            try:
+                with gzip.open(filename, 'rb') as chunk_file:
+                    version = chunk_file.read(4)
+                    chunk_file.seek(0)
+                    if version == V6_VERSION:
+                        record_size = self.v6_struct.size
+                    elif version == V5_VERSION:
+                        record_size = self.v5_struct.size
+                    elif version == V4_VERSION:
+                        record_size = self.v4_struct.size
+                    elif version == V3_VERSION:
+                        record_size = self.v3_struct.size
+                    else:
+                        print('Unknown version {} in file {}'.format(
+                            version, filename))
+                        continue
+                    while True:
+                        # TODO revert after testing this
+                        chunkdata = chunk_file.read(256 * record_size)
+                        # chunkdata = chunk_file.read(1 * record_size)
+                        if len(chunkdata) == 0:
+                            break
+                        for item in self.sample_record(chunkdata):
+                            yield item
+                            # writer.send_bytes(item)
+                            # planes, probs, winner, best_q, plies_left = train_parser.convert_v6_to_tuple(item)
+                            # print(planes)
+
+            except:
+                print("fai1led to parse {}".format(filename))
+                continue
+
+
 # Tests to check that records parse correctly
 class ChunkParserTest(unittest.TestCase):
     def setUp(self):
