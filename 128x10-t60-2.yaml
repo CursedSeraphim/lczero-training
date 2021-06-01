@@ -26,8 +26,8 @@ training:
     renorm_max_d: 0.0
     q_ratio: 0.0
     max_grad_norm: 3.0
-    batch_size: 512                   # training batch
-    num_batch_splits: 4
+    batch_size: 1                   # training batch
+    num_batch_splits: 1
     test_steps: 1000                    # eval test set values after this many steps
     num_test_positions: 100000
     train_avg_report_steps: 100        # training reports its average values after this many steps.

@@ -403,6 +403,50 @@ class ChunkParser:
         return (planes, probs, winner, best_q, plies_left)
 
 
+    def custom_sample_record(self, chunkdata):
+        """
+        Randomly sample through the v3/4/5/6 chunk data and select records in v6 format
+        removed randomness
+        """
+        version = chunkdata[0:4]
+        if version == V6_VERSION:
+            record_size = self.v6_struct.size
+        elif version == V5_VERSION:
+            record_size = self.v5_struct.size
+        elif version == V4_VERSION:
+            record_size = self.v4_struct.size
+        elif version == V3_VERSION:
+            record_size = self.v3_struct.size
+        else:
+            return
+
+        for i in range(0, len(chunkdata), record_size):
+            # no random skipping
+
+            record = chunkdata[i:i + record_size]
+            # for earlier versions, append fake bytes to record to maintain size
+            if version == V3_VERSION:
+                # add 16 bytes of fake root_q, best_q, root_d, best_d to match V4 format
+                record += 16 * b'\x00'
+            if version == V3_VERSION or version == V4_VERSION:
+                # add 12 bytes of fake root_m, best_m, plies_left to match V5 format
+                record += 12 * b'\x00'
+                # insert 4 bytes of classical input format tag to match v5 format
+                record = record[:4] + CLASSICAL_INPUT + record[4:]
+            if version == V3_VERSION or version == V4_VERSION or version == V5_VERSION:
+                # add 48 byes of fake result_q, result_d etc
+                record += 48 * b'\x00'
+
+            if version == V6_VERSION:
+                # value focus code, peek at best_q and orig_q from record (unpacks as tuple with one item)
+                best_q = struct.unpack('f', record[8284:8288])[0]
+                orig_q = struct.unpack('f', record[8328:8332])[0]
+
+                # no randomness here either
+
+            yield record
+
+
     def sample_record(self, chunkdata):
         """
         Randomly sample through the v3/4/5/6 chunk data and select records in v6 format
@@ -447,11 +491,11 @@ class ChunkParser:
                 orig_q = struct.unpack('f', record[8328:8332])[0]
                 
                 # if orig_q is NaN, accept, else accept based on value focus
-                # if not np.isnan(orig_q):
-                #     diff_q = abs(best_q - orig_q)
-                #     thresh_p = self.value_focus_min + self.value_focus_slope * diff_q
-                #     if thresh_p < 1.0 and random.random() > thresh_p:
-                #         continue
+                if not np.isnan(orig_q):
+                    diff_q = abs(best_q - orig_q)
+                    thresh_p = self.value_focus_min + self.value_focus_slope * diff_q
+                    if thresh_p < 1.0 and random.random() > thresh_p:
+                        continue
 
             yield record
 
@@ -593,11 +637,8 @@ class ChunkParser:
                         # chunkdata = chunk_file.read(1 * record_size)
                         if len(chunkdata) == 0:
                             break
-                        for item in self.sample_record(chunkdata):
+                        for item in self.custom_sample_record(chunkdata):
                             yield item
-                            # writer.send_bytes(item)
-                            # planes, probs, winner, best_q, plies_left = train_parser.convert_v6_to_tuple(item)
-                            # print(planes)
 
             except:
                 print("fai1led to parse {}".format(filename))

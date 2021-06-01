@@ -520,18 +520,25 @@ def main(cmd):
     # load net from weights file given in yaml config
     tfprocess.replace_weights_v2(proto_filename=cmd.net, ignore_errors=False)
 
-    # TODO try doing this manually
-    custom_parse_gen = train_parser.custom_parse(train_chunks)
-    custom_iter = iter(custom_parse_gen)
-    data = next(custom_iter)
-    planes, probs, winner, best_q = train_parser.custom_get_batch(data)
-    print(planes.shape)
-    x = planes
+    train_chunks = sorted(train_chunks)
 
-    for i in range(5):
-        print(x[i, 0].reshape(8,8))
+    custom_parse_gen = train_parser.custom_parse(train_chunks)
+    print(train_chunks)
+    counter = 0
+    custom_iter = iter(custom_parse_gen)
+    for data in custom_iter:#i in range(30):
+        # data = next(custom_iter)
+        planes, probs, winner, best_q = train_parser.custom_get_batch(data)
+        print(planes.shape)
+        x = planes
+
+        # TODO make sure no shuffling happens. the following output should clearly show the first few moves of the game w.r.t. pawn placement
+        for i in range(len(x)):
+            counter += 1
+            print('move no.:', counter)
+            print(x[i, 0].reshape(8,8))
+            print()
         print()
-    print()
 
     # TODO
     # print(tfprocess.model.summary())
@@ -549,13 +556,7 @@ def main(cmd):
     input = np.array(early_pred_single[0])
     print(input.shape)
 
-    # TODO make sure no shuffling happens. the following output should clearly show the first few moves of the game w.r.t. pawn placement
-    # investigate first 5 pawn moves
-    np.set_printoptions(threshold=sys.maxsize)
-    for i in range(5):
-        print(input[0, i, 0].reshape(8,8))
-        print()
-    print()
+    
 
     # print(early_pred_single[0]) # input
     # print(early_pred_single[1]) # output
