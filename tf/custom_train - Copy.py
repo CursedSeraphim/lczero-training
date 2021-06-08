@@ -516,25 +516,14 @@ def main(cmd):
             validation_dataset = validation_dataset.with_options(options)
 
 
-
-    ##########################
-    # Custom Implementations #
-    ##########################
-
-
-
     tfprocess.init_v2(train_dataset, test_dataset, validation_dataset)
     # load net from weights file given in yaml config
     tfprocess.replace_weights_v2(proto_filename=cmd.net, ignore_errors=False)
 
-    # sort data files
     train_chunks = sorted(train_chunks)
 
-    # create predictor that gives access to specific intermediate layer
-    earlyPredictor = tf.keras.models.Model(tfprocess.model.inputs, [tfprocess.model.inputs, tfprocess.model.outputs, tfprocess.model.get_layer('activation_31').output])
-
-    # create custom iterator which doesn't shuffle the data etc
     custom_parse_gen = train_parser.custom_parse(train_chunks)
+    print(train_chunks)
     counter = 0
     custom_iter = iter(custom_parse_gen)
     for data in custom_iter:#i in range(30):
@@ -542,8 +531,6 @@ def main(cmd):
         planes, probs, winner, best_q = train_parser.custom_get_batch(data)
         print(planes.shape)
         x = planes
-        _, _, activation_31 = earlyPredictor.predict(x)
-        print(activation_31.shape)
 
         # TODO make sure no shuffling happens. the following output should clearly show the first few moves of the game w.r.t. pawn placement
         for i in range(len(x)):
@@ -553,6 +540,52 @@ def main(cmd):
             print()
         print()
 
+    # TODO
+    # print(tfprocess.model.summary())
+    # print(tfprocess.train_dataset)
+    # data_iter = iter(tfprocess.train_dataset)
+    # nxt = next(data_iter)
+    # x, _, _, _, _ = nxt
+    # x2_0_r = tf.reshape(x[0], [1, 112, 64])
+
+    # pred = tfprocess.model.predict(x)
+
+    earlyPredictor = tf.keras.models.Model(tfprocess.model.inputs, [tfprocess.model.inputs, tfprocess.model.outputs, tfprocess.model.get_layer('activation_31').output])
+    early_pred_single = earlyPredictor.predict(x)
+    # print(np.array(early_pred_single[0]).shape)
+    input = np.array(early_pred_single[0])
+    print(input.shape)
+
+    
+
+    # print(early_pred_single[0]) # input
+    # print(early_pred_single[1]) # output
+    # print(early_pred_single[2]) # intermediate layer
+
+    # print(train_parser.sample_record())
+    # print(next(tfprocess.train_iter))
+
+    # tfprocess.restore_v2()
+
+    # If number of test positions is not given
+    # sweeps through all test chunks statistically
+    # Assumes average of 10 samples per test game.
+    # For simplicity, testing can use the split batch size instead of total batch size.
+    # This does not affect results, because test results are simple averages that are independent of batch size.
+    # num_evals = cfg['training'].get('num_test_positions',
+    #                                 len(test_chunks) * 10)
+    # num_evals = max(1, num_evals // ChunkParser.BATCH_SIZE)
+    # print("Using {} evaluation batches".format(num_evals))
+    # tfprocess.total_batch_size = total_batch_size
+    # tfprocess.process_loop_v2(total_batch_size,
+    #                           num_evals,
+    #                           batch_splits=batch_splits)
+
+    # if cmd.output is not None:
+    #     if cfg['training'].get('swa_output', False):
+    #         tfprocess.save_swa_weights_v2(cmd.output)
+    #     else:
+    #         tfprocess.save_leelaz_weights_v2(cmd.output)
 
     train_parser.shutdown()
     test_parser.shutdown()
