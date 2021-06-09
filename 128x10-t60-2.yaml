@@ -4,7 +4,7 @@ name: '128x10-2'                  # ideally no spaces
 gpu: 'all'                                 # gpu id to process on
 
 dataset: 
-  num_chunks: 5                   # newest nof chunks to parse
+  num_chunks: 7                   # newest nof chunks to parse
   allow_less_chunks: true
   train_ratio: 1.0                    # trainingset ratio
   # For separated test and train data.
