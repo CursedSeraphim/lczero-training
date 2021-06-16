@@ -603,13 +603,21 @@ class ChunkParser:
 
     def custom_get_batch(self, data):
         planes, probs, winner, best_q = (np.reshape(np.frombuffer(data[0], dtype=np.float32),
-                            (self.batch_size, 112, 64)),
+                            (-1, 112, 64)),
                  np.reshape(np.frombuffer(data[1], dtype=np.int32),
-                            (self.batch_size, 1858)),
+                            (-1, 1858)),
                  np.reshape(np.frombuffer(data[2], dtype=np.float32),
-                            (self.batch_size, 3)),
+                            (-1, 3)),
                  np.reshape(np.frombuffer(data[3], dtype=np.float32),
-                            (self.batch_size, 3)))
+                            (-1, 3)))
+        # planes, probs, winner, best_q = (np.reshape(np.frombuffer(data[0], dtype=np.float32),
+        #                     (self.batch_size, 112, 64)),
+        #          np.reshape(np.frombuffer(data[1], dtype=np.int32),
+        #                     (self.batch_size, 1858)),
+        #          np.reshape(np.frombuffer(data[2], dtype=np.float32),
+        #                     (self.batch_size, 3)),
+        #          np.reshape(np.frombuffer(data[3], dtype=np.float32),
+        #                     (self.batch_size, 3)))
         
         return planes, probs, winner, best_q
 

@@ -26,6 +26,7 @@ import random
 import multiprocessing as mp
 import tensorflow as tf
 import numpy as np
+import pandas as pd
 import struct
 from tfprocess import TFProcess
 from chunkparser import ChunkParser
@@ -535,24 +536,37 @@ def main(cmd):
 
     # create custom iterator which doesn't shuffle the data etc
     custom_parse_gen = train_parser.custom_parse(train_chunks)
-    counter = 0
+    turn_counter = 0
     custom_iter = iter(custom_parse_gen)
+
+    # prepare dataframe
+    df = pd.DataFrame()
+
+    # iterate entire dataset generator / iterator
     for data in custom_iter:#i in range(30):
         # data = next(custom_iter)
         planes, probs, winner, best_q = train_parser.custom_get_batch(data)
-        print(planes.shape)
         x = planes
+        print('predicting...')
         _, _, activation_31 = earlyPredictor.predict(x)
         print(activation_31.shape)
+        # append to dataframe
+        df = df.append(pd.DataFrame(activation_31.reshape(-1,128*8*8)))
 
         # TODO make sure no shuffling happens. the following output should clearly show the first few moves of the game w.r.t. pawn placement
-        for i in range(len(x)):
-            counter += 1
-            print('move no.:', counter)
-            print(x[i, 0].reshape(8,8))
-            print()
-        print()
+        # for i in range(len(x)):
+        #     counter += 1
+        #     print('move no.:', counter)
+        #     print(x[i, 0].reshape(8,8))
+        #     print()
+        turn_counter += len(x)
+        
+        print('turns:', len(x), turn_counter)
+        # print(x[0, 0].reshape(8,8))
 
+    df.info()
+    df.to_csv('alphazero_vs_stockfish.csv')
+    print('終わり')
 
     train_parser.shutdown()
     test_parser.shutdown()
