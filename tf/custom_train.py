@@ -527,12 +527,16 @@ def main(cmd):
     tfprocess.init_v2(train_dataset, test_dataset, validation_dataset)
     # load net from weights file given in yaml config
     tfprocess.replace_weights_v2(proto_filename=cmd.net, ignore_errors=False)
+    tfprocess.model.summary()
 
     # sort data files
     train_chunks = sorted(train_chunks)
 
     # create predictor that gives access to specific intermediate layer
-    earlyPredictor = tf.keras.models.Model(tfprocess.model.inputs, [tfprocess.model.inputs, tfprocess.model.outputs, tfprocess.model.get_layer('activation_31').output])
+    # TODO change layer variable names etc
+    layer_name = 'apply_policy_map'
+    layer = tfprocess.model.get_layer(layer_name)
+    earlyPredictor = tf.keras.models.Model(tfprocess.model.inputs, [tfprocess.model.inputs, tfprocess.model.outputs, layer.output])
 
     # create custom iterator which doesn't shuffle the data etc
     custom_parse_gen = train_parser.custom_parse(train_chunks)
@@ -548,10 +552,11 @@ def main(cmd):
         planes, probs, winner, best_q = train_parser.custom_get_batch(data)
         x = planes
         print('predicting...')
-        _, _, activation_31 = earlyPredictor.predict(x)
-        print(activation_31.shape)
+        _, _, layer_results = earlyPredictor.predict(x)
         # append to dataframe
-        df = df.append(pd.DataFrame(activation_31.reshape(-1,128*8*8)))
+        # df = df.append(pd.DataFrame(activation_31.reshape(-1,128*8*8)))
+        shape_tuple = (-1, np.prod(layer.output_shape[1:]))
+        df = df.append(pd.DataFrame(layer_results.reshape(shape_tuple)))
 
         # TODO make sure no shuffling happens. the following output should clearly show the first few moves of the game w.r.t. pawn placement
         # for i in range(len(x)):
@@ -565,8 +570,8 @@ def main(cmd):
         # print(x[0, 0].reshape(8,8))
 
     df.info()
-    df.to_csv('alphazero_vs_stockfish.csv')
-    print('終わり')
+    df.to_csv('intermediate_layer_results.csv')
+    print('done')
 
     train_parser.shutdown()
     test_parser.shutdown()
