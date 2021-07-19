@@ -30,6 +30,7 @@ import pandas as pd
 import struct
 from tfprocess import TFProcess
 from chunkparser import ChunkParser
+from multiprocessing import freeze_support
 
 V6_VERSION = struct.pack('i', 6)
 V5_VERSION = struct.pack('i', 5)
@@ -519,7 +520,7 @@ def main(cmd):
 
 
     ##########################
-    # Custom Implementations #
+    # Custom Additions #
     ##########################
 
 
@@ -529,64 +530,102 @@ def main(cmd):
     tfprocess.replace_weights_v2(proto_filename=cmd.net, ignore_errors=False)
     tfprocess.model.summary()
 
-    # sort data files
-    train_chunks = sorted(train_chunks)
+    for layer_name, path in zip(cmd.layer, cmd.path):
 
-    # create predictor that gives access to specific intermediate layer
-    # TODO change layer variable names etc
-    layer_name = 'apply_policy_map'
-    layer = tfprocess.model.get_layer(layer_name)
-    earlyPredictor = tf.keras.models.Model(tfprocess.model.inputs, [tfprocess.model.inputs, tfprocess.model.outputs, layer.output])
+        # sort data files
+        train_chunks = sorted(train_chunks)
 
-    # create custom iterator which doesn't shuffle the data etc
-    custom_parse_gen = train_parser.custom_parse(train_chunks)
-    turn_counter = 0
-    custom_iter = iter(custom_parse_gen)
+        # create predictor that gives access to specific intermediate layer
+        layer = tfprocess.model.get_layer(layer_name)
+        earlyPredictor = tf.keras.models.Model(tfprocess.model.inputs, [tfprocess.model.inputs, tfprocess.model.outputs, layer.output])
 
-    # prepare dataframe
-    df = pd.DataFrame()
+        # create custom iterator which doesn't shuffle the data etc
+        custom_parse_gen = train_parser.custom_parse(train_chunks)
+        turn_counter = 0
+        custom_iter = iter(custom_parse_gen)
 
-    # iterate entire dataset generator / iterator
-    for data in custom_iter:#i in range(30):
-        # data = next(custom_iter)
-        planes, probs, winner, best_q = train_parser.custom_get_batch(data)
-        x = planes
-        print('predicting...')
-        _, _, layer_results = earlyPredictor.predict(x)
-        # append to dataframe
-        # df = df.append(pd.DataFrame(activation_31.reshape(-1,128*8*8)))
-        shape_tuple = (-1, np.prod(layer.output_shape[1:]))
-        df = df.append(pd.DataFrame(layer_results.reshape(shape_tuple)))
+        # prepare dataframe
+        df = pd.DataFrame()
 
-        # TODO make sure no shuffling happens. the following output should clearly show the first few moves of the game w.r.t. pawn placement
-        # for i in range(len(x)):
-        #     counter += 1
-        #     print('move no.:', counter)
-        #     print(x[i, 0].reshape(8,8))
-        #     print()
-        turn_counter += len(x)
-        
-        print('turns:', len(x), turn_counter)
-        # print(x[0, 0].reshape(8,8))
+        # iterate entire dataset generator / iterator
+        for data in custom_iter:#i in range(30):
+            # data = next(custom_iter)
+            planes, probs, winner, best_q = train_parser.custom_get_batch(data)
+            x = planes
+            print('predicting...')
+            _, _, layer_results = earlyPredictor.predict(x)
+            # append to dataframe
+            # df = df.append(pd.DataFrame(activation_31.reshape(-1,128*8*8)))
+            shape_tuple = (-1, np.prod(layer.output_shape[1:]))
+            df = df.append(pd.DataFrame(layer_results.reshape(shape_tuple)))
 
-    df.info()
-    df.to_csv('intermediate_layer_results.csv')
-    print('done')
+            turn_counter += len(x)
+            
+
+        df.info()
+        df.to_csv(path)
+
+        print('done')
 
     train_parser.shutdown()
     test_parser.shutdown()
 
 
 if __name__ == "__main__":
+    freeze_support()
     argparser = argparse.ArgumentParser(description=\
     'Tensorflow pipeline for training Leela Chess.')
     argparser.add_argument('--cfg',
-                           type=argparse.FileType('r'),
-                           help='yaml configuration with training parameters')
+                            type=argparse.FileType('r'),
+                            help='yaml configuration with training parameters')
     argparser.add_argument('--output',
-                           type=str,
-                           help='file to store weights in')
+                            type=str,
+                            help='file to store weights in')
+    argparser.add_argument('--layer',
+                            type=str,
+                            help='name of network layer the logs of which should be stored to the csv')    
+    argparser.add_argument('--path',
+                            type=str,
+                            help='path for storing the csv')    
+    cmd = argparser.parse_args()
+    cmd.cfg = open('128x10-t60-2.yaml')
+    cmd.net = '128x10-t60-2-5300.pb.gz'
 
-    #mp.set_start_method('spawn')
-    main(argparser.parse_args())
-    mp.freeze_support()
+    main(cmd)
+
+
+def write_layer_csv(intermediate_layer: str, path: str):
+    freeze_support()
+    argparser = argparse.ArgumentParser(description=\
+    'Tensorflow pipeline for training Leela Chess.')
+    argparser.add_argument('--cfg',
+                            type=argparse.FileType('r'),
+                            help='yaml configuration with training parameters')
+    argparser.add_argument('--output',
+                            type=str,
+                            help='file to store weights in')
+    argparser.add_argument('--layer',
+                            type=str,
+                            help='name of network layer the logs of which should be stored to the csv')    
+    argparser.add_argument('--path',
+                            type=str,
+                            help='path for storing the csv')    
+    cmd = argparser.parse_args()
+    cmd.cfg = open('128x10-t60-2.yaml')
+    cmd.net = '128x10-t60-2-5300.pb.gz'
+
+    main(cmd)
+
+
+    # argparser = argparse.ArgumentParser(description=\
+    # 'Tensorflow pipeline for training Leela Chess.')
+    # argparser.add_argument('--cfg',
+    #                        type=argparse.FileType('r'),
+    #                        help='yaml configuration with training parameters')
+    # argparser.add_argument('--output',
+    #                        type=str,
+    #                        help='file to store weights in')
+
+    # #mp.set_start_method('spawn')
+    # main(argparser.parse_args())
+    # mp.freeze_support()
